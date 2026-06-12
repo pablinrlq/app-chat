@@ -1,8 +1,9 @@
 // DAO de mensagens do chat — baseado na estrutura do RecursoNuvemDao (Java):
 // singleton, conectar() lendo .env, criação automática da tabela (PAY_PER_REQUEST)
 // e suporte a DynamoDB Local via DYNAMODB_ENDPOINT.
-// As mensagens recebem um TTL de 1 hora (atributo "expiraEm") e o DynamoDB
-// as exclui automaticamente após expirar.
+// As mensagens recebem um TTL de 5 minutos (atributo "expiraEm") e uma
+// limpeza periódica no server.js as exclui após expirar (com o TTL nativo
+// do DynamoDB como plano B).
 
 require('dotenv').config({ quiet: true });
 
@@ -16,11 +17,11 @@ const {
     waitUntilTableExists,
     ResourceNotFoundException
 } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, PutCommand, ScanCommand, BatchWriteCommand } = require('@aws-sdk/lib-dynamodb');
 const { STSClient, GetCallerIdentityCommand } = require('@aws-sdk/client-sts');
 
 const TABELA_PADRAO = 'MensagensChat';
-const TTL_SEGUNDOS = 60 * 60; // 1 hora
+const TTL_SEGUNDOS = 5 * 60; // 5 minutos
 
 class MensagemDao {
     constructor() {
@@ -162,6 +163,41 @@ class MensagemDao {
         } while (chaveInicial);
 
         return itens.sort((a, b) => a.enviadaEm - b.enviadaEm);
+    }
+
+
+    async excluirExpiradas() {
+        const agora = Math.floor(Date.now() / 1000);
+        let excluidas = 0;
+        let chaveInicial;
+
+        do {
+            const pagina = await this.documento.send(new ScanCommand({
+                TableName: this.nomeTabela,
+                FilterExpression: 'expiraEm <= :agora',
+                ExpressionAttributeValues: { ':agora': agora },
+                ProjectionExpression: 'id',
+                ExclusiveStartKey: chaveInicial
+            }));
+
+            const itens = pagina.Items || [];
+            // BatchWrite aceita no máximo 25 exclusões por chamada
+            for (let i = 0; i < itens.length; i += 25) {
+                const lote = itens.slice(i, i + 25);
+                await this.documento.send(new BatchWriteCommand({
+                    RequestItems: {
+                        [this.nomeTabela]: lote.map((item) => ({
+                            DeleteRequest: { Key: { id: item.id } }
+                        }))
+                    }
+                }));
+                excluidas += lote.length;
+            }
+
+            chaveInicial = pagina.LastEvaluatedKey;
+        } while (chaveInicial);
+
+        return excluidas;
     }
 
     isConectado() { return this.conectado; }

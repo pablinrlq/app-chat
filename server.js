@@ -13,6 +13,18 @@ app.use(express.static('public'));
 // em tempo real mesmo se a conexão falhar — só fica sem histórico)
 mensagemDao.conectar();
 
+// De 5 em 5 minutos, apaga fisicamente as mensagens expiradas
+// (o TTL nativo do DynamoDB fica como plano B, pois não exclui na hora exata)
+const INTERVALO_LIMPEZA = 5 * 60 * 1000;
+setInterval(() => {
+    if (!mensagemDao.isConectado()) return;
+    mensagemDao.excluirExpiradas()
+        .then((qtd) => {
+            if (qtd > 0) console.log(`Limpeza: ${qtd} mensagem(ns) expirada(s) excluída(s).`);
+        })
+        .catch((erro) => console.error(`Erro na limpeza de mensagens: ${erro.message}`));
+}, INTERVALO_LIMPEZA);
+
 io.on('connection', (socket) => {
 
     // Quando um novo usuário digita o nome e entra
