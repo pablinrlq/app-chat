@@ -24,10 +24,9 @@ chatForm.addEventListener('submit', function(e) {
     }
 });
 
-// Recebe mensagens de usuários
-socket.on('mensagem_chat', function(dados) {
+function renderizarMensagem(dados) {
     const divMensagem = document.createElement('div');
-    
+
     // Cria o rótulo com o nome do usuário
     const spanNome = document.createElement('div');
     spanNome.className = 'user-name';
@@ -40,7 +39,7 @@ socket.on('mensagem_chat', function(dados) {
     // Monta a estrutura
     divMensagem.appendChild(spanNome);
     divMensagem.appendChild(spanTexto);
-    
+
     // Verifica se a mensagem é minha ou de outro
     if(dados.usuario === meuNome) {
         divMensagem.className = 'message my-message';
@@ -51,6 +50,14 @@ socket.on('mensagem_chat', function(dados) {
 
     mensagensContainer.appendChild(divMensagem);
     mensagensContainer.scrollTop = mensagensContainer.scrollHeight;
+}
+
+// Recebe mensagens de usuários
+socket.on('mensagem_chat', renderizarMensagem);
+
+// Recebe o histórico (mensagens da última hora) ao entrar no chat
+socket.on('historico_mensagens', function(lista) {
+    lista.forEach(renderizarMensagem);
 });
 
 // Recebe mensagens do sistema (Entrou/Saiu)
