@@ -68,7 +68,9 @@ class MensagemDao {
             }
 
             this.clienteDynamo = new DynamoDBClient(config);
-            this.documento = DynamoDBDocumentClient.from(this.clienteDynamo);
+            this.documento = DynamoDBDocumentClient.from(this.clienteDynamo, {
+                marshallOptions: { removeUndefinedValues: true }
+            });
 
             if (!this.contaAws) {
                 const sts = new STSClient(config);
@@ -136,10 +138,20 @@ class MensagemDao {
         const item = {
             id: crypto.randomUUID(),
             usuario: mensagem.usuario || 'Anônimo',
-            texto: mensagem.texto,
+            texto: mensagem.texto || '',
             enviadaEm: agora,
             expiraEm: agora + TTL_SEGUNDOS
         };
+        // Anexo (foto/áudio/arquivo): guarda só a chave do S3 e os metadados;
+        // a URL assinada é gerada na hora de exibir, porque expira
+        if (mensagem.anexo && mensagem.anexo.key) {
+            item.anexo = {
+                key: mensagem.anexo.key,
+                nome: mensagem.anexo.nome || 'arquivo',
+                tipo: mensagem.anexo.tipo || 'application/octet-stream',
+                tamanho: mensagem.anexo.tamanho || 0
+            };
+        }
         await this.documento.send(new PutCommand({ TableName: this.nomeTabela, Item: item }));
         return item;
     }
@@ -169,6 +181,7 @@ class MensagemDao {
     async excluirExpiradas() {
         const agora = Math.floor(Date.now() / 1000);
         let excluidas = 0;
+        const chavesAnexos = [];
         let chaveInicial;
 
         do {
@@ -176,11 +189,15 @@ class MensagemDao {
                 TableName: this.nomeTabela,
                 FilterExpression: 'expiraEm <= :agora',
                 ExpressionAttributeValues: { ':agora': agora },
-                ProjectionExpression: 'id',
+                ProjectionExpression: 'id, anexo',
                 ExclusiveStartKey: chaveInicial
             }));
 
             const itens = pagina.Items || [];
+            itens.forEach((item) => {
+                if (item.anexo && item.anexo.key) chavesAnexos.push(item.anexo.key);
+            });
+
             // BatchWrite aceita no máximo 25 exclusões por chamada
             for (let i = 0; i < itens.length; i += 25) {
                 const lote = itens.slice(i, i + 25);
@@ -197,7 +214,8 @@ class MensagemDao {
             chaveInicial = pagina.LastEvaluatedKey;
         } while (chaveInicial);
 
-        return excluidas;
+        // Devolve as chaves dos anexos para o chamador apagar do S3 também
+        return { excluidas, chavesAnexos };
     }
 
     isConectado() { return this.conectado; }

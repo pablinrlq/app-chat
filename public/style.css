@@ -141,3 +141,53 @@ button:hover {
     width: fit-content;
     font-style: italic;
 }
+
+/* Anexos (fotos, áudios e arquivos) */
+
+.btn-acao {
+    background: #8696A0;
+    margin-left: 0;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.btn-acao:hover {
+    background: #075E54;
+}
+
+.btn-acao:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+
+#btnAudio.gravando {
+    background: #E53935;
+    animation: pulsar 1s infinite;
+}
+
+@keyframes pulsar {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.anexo-imagem {
+    display: block;
+    max-width: 240px;
+    max-height: 240px;
+    border-radius: 10px;
+    margin: 4px 0;
+}
+
+.anexo-audio {
+    display: block;
+    max-width: 240px;
+    margin: 4px 0;
+}
+
+.anexo-arquivo {
+    display: inline-block;
+    margin: 4px 0;
+    color: #075E54;
+    font-weight: bold;
+    word-break: break-all;
+}

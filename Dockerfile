@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY server.js mensagemDao.js ./
+COPY server.js mensagemDao.js anexoDao.js ./
 COPY public ./public
 
 EXPOSE 8081
