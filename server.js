@@ -1,3 +1,5 @@
+require('dotenv').config({ quiet: true });
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -6,6 +8,32 @@ const mensagemDao = require('./mensagemDao');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+// Com mais de uma instância atrás de um load balancer, o io.emit só alcança
+// os sockets do próprio processo. O adapter de Redis faz o pub/sub entre as
+// instâncias. Só ativa se REDIS_URL estiver definida — sem ela, o servidor
+// funciona normalmente sozinho.
+async function configurarAdapterRedis() {
+    const url = process.env.REDIS_URL;
+    if (!url) return;
+
+    try {
+        const { createClient } = require('redis');
+        const { createAdapter } = require('@socket.io/redis-adapter');
+
+        const pubClient = createClient({ url });
+        const subClient = pubClient.duplicate();
+        pubClient.on('error', (e) => console.error(`Redis (pub): ${e.message}`));
+        subClient.on('error', (e) => console.error(`Redis (sub): ${e.message}`));
+
+        await Promise.all([pubClient.connect(), subClient.connect()]);
+        io.adapter(createAdapter(pubClient, subClient));
+        console.log('Socket.io com adapter Redis ativo (broadcast entre instâncias).');
+    } catch (erro) {
+        console.error(`Falha ao ativar o adapter Redis: ${erro.message}`);
+    }
+}
+configurarAdapterRedis();
 
 app.use(express.static('public'));
 
