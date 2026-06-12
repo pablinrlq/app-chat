@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat em Tempo Real | Node.js</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="chat-container">
+        <header class="chat-header">
+            💬 Chat Global WebSockets
+        </header>
+
+        <div class="chat-messages" id="mensagens">
+            </div>
+
+        <form class="chat-input-container" id="chat-form">
+            <input type="text" id="inputMsg" placeholder="Digite sua mensagem..." autocomplete="off" required>
+            <button type="submit">➤</button>
+        </form>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
